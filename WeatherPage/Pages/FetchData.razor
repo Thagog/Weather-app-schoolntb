@@ -1,0 +1,162 @@
+﻿@page "/"
+
+@using WeatherPage.Data
+@inject WeatherForecastService ForecastService
+@inject IJSRuntime runtime
+
+<h1 style="text-align:center">Aktuální počasí</h1>
+
+<p style="text-align:center">Do okýnka napište název města a aplikace vám ukáže aktuální počasí.</p>
+
+@if (forecasts == null)
+{
+    <p><em>Načítání...</em></p>
+}
+else
+{
+
+    <head>
+        <style>
+            * {
+                color: white;
+            }
+            body {
+                @bg
+            }
+            .CENT {
+                text-align: center;
+                padding: 3rem 2rem 2rem 3rem 2rem;
+                font-family: Bahnschrift;
+                font-size: large;
+            }
+        </style>
+
+    </head>
+    <body>
+
+
+        <div class="CENT">
+            <input style="border-radius: 10px; color: black; " type="text" @bind="CityName" @onkeydown="ValChanged" @oninput="@((e) => { CityName=(string)e.Value;})"/>
+            
+            <br /><br />
+            <p>@forecasts.name &nbsp; &nbsp;  @Math.Round(forecasts.main.temp - 273.15, 2)°C</p>
+            <p>Rychlost větru: @forecasts.wind.speed m/s&nbsp; &nbsp; <img src=@GetIcon() /> @forecasts.weather[0].description</p>
+            <p>Vlhkost: @forecasts.main.humidity % &nbsp; &nbsp; Pocitová teplota: @Math.Round(forecasts.main.feels_like - 273.15, 2)°C</p>
+            @if (Math.Round(forecasts.main.temp - 273.15, 2) > 20)
+            {
+                <img src="/resources/hot.png">
+            }
+            else if (Math.Round(forecasts.main.temp - 273.15, 2) < 0)
+            {
+                <img src="/resources/freezing.png">
+            }
+            else if (Math.Round(forecasts.main.temp - 273.15, 2) < 5)
+            {
+                <img src="/resources/neutral.png">
+            }
+            else{
+                <img src="/resources/smiling.png">
+            }
+
+        </div>
+        
+
+    </body>
+
+
+}
+    @code {
+    public WeatherForecastModel forecasts;
+    string CityName { get; set; }
+    public Dictionary<string, string> Prekladstatusu { get; set; }
+    public string bg = $"background: linear-gradient(to right, #003973, #e5e5be)";
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        forecasts = await ForecastService.GetForecastAsync("London");
+
+    }
+
+    public async void ValChanged(KeyboardEventArgs args)
+
+    {
+        if (args.Key == "Enter")
+        {;
+            var defforecast = forecasts;
+            try
+            {
+
+
+                forecasts = await ForecastService.GetForecastAsync(CityName);
+                bg = GetGradient();
+
+
+                if (forecasts.cod == 404)
+                {
+                    forecasts = defforecast;
+                    throw new Exception(CityName + " neexistuje.");
+
+                }
+                StateHasChanged(); //nezmeni se vzhled stranky pokud se nezavola tento pan
+            }
+            catch (Exception e)
+            {
+
+
+                await runtime.InvokeAsync<Object>("window.ShowError", e.Message);
+                forecasts = defforecast;
+            }
+
+
+
+        }
+
+    }
+    public string GetIcon()
+    {
+        string code = forecasts.weather[0].icon;
+        string imgsrc = $"http://openweathermap.org/img/wn/{code}.png";
+        return imgsrc;
+    }
+    public string GetGradient()
+    {
+
+        Random rng = new Random();
+
+        int r = rng.Next(150, 220);
+        int i1 = rng.Next(1, 90);
+        int i2 = rng.Next(50, 99);
+        string i3 = r.ToString("X");
+        string right = "#e55d87";
+        string left = "#5fc3e4";
+        string defval = $"background: linear-gradient(to right, {right}, {left});";
+        if(forecasts.cod != 404)
+        {
+            if (Math.Round(forecasts.main.temp - 273.15, 2) < 0)
+              {
+                right = $"#{i1.ToString()}{i2.ToString()}{i3}";
+                left = $"#{i1.ToString()}{i1.ToString()}{i1.ToString()}";
+              }
+            else if (Math.Round(forecasts.main.temp - 273.15, 2) > 20)
+              {
+                right = $"#{i3}{i2.ToString()}{i1.ToString()}";
+                left = $"#{i1.ToString()}{i1.ToString()}{i1.ToString()}";
+              }
+            else
+              {
+                right = $"#{i2.ToString()}{i3}{i2.ToString()}";
+                left = $"#{i1.ToString()}{i1.ToString()}{i1.ToString()}";
+              }
+        
+        
+        
+        
+        }
+        string grad = $"background: linear-gradient(to right, {right}, {left});";
+        return grad;
+
+    }
+
+
+}
